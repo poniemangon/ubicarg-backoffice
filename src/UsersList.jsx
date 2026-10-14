@@ -4,6 +4,21 @@ import UserBadgesModal from './UserBadgesModal'
 
 const PAGE_SIZE = 30
 
+// PostgREST caps every response at 1000 rows (Supabase's default max-rows),
+// so an unpaginated select silently stops at 1000. Pull pages with .range()
+// until a short page comes back. buildQuery must return a fresh query with a
+// stable order (ties broken by id) so pages don't overlap or skip rows.
+const FETCH_CHUNK = 1000
+async function fetchAll(buildQuery) {
+  const all = []
+  for (let from = 0; ; from += FETCH_CHUNK) {
+    const { data, error } = await buildQuery().range(from, from + FETCH_CHUNK - 1)
+    if (error) return { data: null, error }
+    all.push(...data)
+    if (data.length < FETCH_CHUNK) return { data: all, error: null }
+  }
+}
+
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -27,12 +42,14 @@ export default function UsersList() {
   const [selectedUser, setSelectedUser] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('id, created_at')
-      .eq('is_bot', false)
-      .order('created_at', { ascending: true })
-      .then(({ data, error: rankError }) => {
+    fetchAll(() =>
+      supabase
+        .from('profiles')
+        .select('id, created_at')
+        .eq('is_bot', false)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true }),
+    ).then(({ data, error: rankError }) => {
         if (rankError) {
           console.error(rankError)
           return
@@ -40,10 +57,9 @@ export default function UsersList() {
         setSignupRank(new Map(data.map((u, i) => [u.id, i + 1])))
       })
 
-    supabase
-      .from('referrals')
-      .select('user_id, visit_count')
-      .then(({ data, error: referralsError }) => {
+    fetchAll(() =>
+      supabase.from('referrals').select('user_id, visit_count').order('user_id', { ascending: true }),
+    ).then(({ data, error: referralsError }) => {
         if (referralsError) {
           console.error(referralsError)
           return
@@ -61,20 +77,17 @@ export default function UsersList() {
   const fetchRows = useCallback(async () => {
     setLoading(true)
     setError(null)
-    let query = supabase
-      .from('profiles')
-      .select('id, username, avatar_url, elo, ranked_games_played, created_at, is_banned, ghost_mode')
-      .eq('is_bot', false)
-
-    if (search.trim()) {
-      const term = search.trim().replace(/[%_]/g, '')
-      query = query.ilike('username', `%${term}%`)
-    }
-    if (ghostOnly) {
-      query = query.eq('ghost_mode', true)
-    }
-
-    const { data, error: fetchError } = await query
+    const term = search.trim().replace(/[%_]/g, '')
+    const { data, error: fetchError } = await fetchAll(() => {
+      let query = supabase
+        .from('profiles')
+        .select('id, username, avatar_url, elo, ranked_games_played, created_at, is_banned, ghost_mode')
+        .eq('is_bot', false)
+        .order('id', { ascending: true })
+      if (term) query = query.ilike('username', `%${term}%`)
+      if (ghostOnly) query = query.eq('ghost_mode', true)
+      return query
+    })
     if (fetchError) {
       setError(fetchError.message)
     } else {
