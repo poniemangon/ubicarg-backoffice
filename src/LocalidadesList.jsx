@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useDebouncedValue } from './useDebouncedValue'
 import LocationPicker from './LocationPicker'
@@ -22,7 +22,6 @@ export default function LocalidadesList() {
   const [loading, setLoading] = useState(true)
   const [uploadingIndex, setUploadingIndex] = useState(null)
   const [error, setError] = useState(null)
-  const debounceRef = useRef(null)
 
   const [addOpen, setAddOpen] = useState(false)
   const [newNombre, setNewNombre] = useState('')
@@ -243,11 +242,7 @@ export default function LocalidadesList() {
           type="text"
           placeholder="Buscar localidad..."
           value={search}
-          onChange={(e) => {
-            const value = e.target.value
-            clearTimeout(debounceRef.current)
-            debounceRef.current = setTimeout(() => handleSearchChange(value), 300)
-          }}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
         <select
           value={comunaFilter}
