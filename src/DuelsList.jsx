@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { useDebouncedValue } from './useDebouncedValue'
 
 const PAGE_SIZE = 30
 
@@ -29,6 +30,7 @@ export default function DuelsList() {
   const [matchmakingFilter, setMatchmakingFilter] = useState('')
   const [modeFilter, setModeFilter] = useState('')
   const [userSearch, setUserSearch] = useState('')
+  const debouncedUserSearch = useDebouncedValue(userSearch)
   const [page, setPage] = useState(0)
   const [rows, setRows] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -94,8 +96,8 @@ export default function DuelsList() {
     // challenger/opponent slots) — so a username filter has to resolve to
     // profile ids first, then match against all three, not just one column.
     let userFilter = null
-    if (userSearch.trim()) {
-      const term = userSearch.trim().replace(/[%_]/g, '')
+    if (debouncedUserSearch.trim()) {
+      const term = debouncedUserSearch.trim().replace(/[%_]/g, '')
       const { data: matches, error: userError } = await supabase.from('profiles').select('id').ilike('username', `%${term}%`)
       if (userError) {
         setError(userError.message)
@@ -172,7 +174,7 @@ export default function DuelsList() {
       setTotalCount(count ?? 0)
     }
     setLoading(false)
-  }, [matchmakingFilter, modeFilter, userSearch, page, botIds])
+  }, [matchmakingFilter, modeFilter, debouncedUserSearch, page, botIds])
 
   useEffect(() => {
     fetchRows()

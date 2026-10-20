@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { useDebouncedValue } from './useDebouncedValue'
 import LocationPicker from './LocationPicker'
 
 const PAGE_SIZE = 30
@@ -10,6 +11,7 @@ function comunaLabel(comuna) {
 
 export default function LocalidadesList() {
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search)
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [comunaFilter, setComunaFilter] = useState('')
   const [provinciaFilter, setProvinciaFilter] = useState('')
@@ -64,8 +66,8 @@ export default function LocalidadesList() {
       .order('pool_index', { ascending: true })
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
 
-    if (search.trim()) {
-      const term = search.trim().replace(/[%_]/g, '')
+    if (debouncedSearch.trim()) {
+      const term = debouncedSearch.trim().replace(/[%_]/g, '')
       query = query.ilike('nombre', `%${term}%`)
     }
     if (onlyMissing) {
@@ -87,7 +89,7 @@ export default function LocalidadesList() {
     }
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, onlyMissing, comunaFilter, provinciaFilter, page, provincias])
+  }, [debouncedSearch, onlyMissing, comunaFilter, provinciaFilter, page, provincias])
 
   useEffect(() => {
     fetchRows()

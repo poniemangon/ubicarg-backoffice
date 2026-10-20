@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { useDebouncedValue } from './useDebouncedValue'
 import UserBadgesModal from './UserBadgesModal'
 
 const PAGE_SIZE = 30
@@ -25,6 +26,7 @@ function formatDate(iso) {
 
 export default function UsersList() {
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search)
   const [ghostOnly, setGhostOnly] = useState(false)
   const [page, setPage] = useState(0)
   const [sortBy, setSortBy] = useState('created_at') // 'created_at' | 'referrals'
@@ -77,7 +79,7 @@ export default function UsersList() {
   const fetchRows = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const term = search.trim().replace(/[%_]/g, '')
+    const term = debouncedSearch.trim().replace(/[%_]/g, '')
     const { data, error: fetchError } = await fetchAll(() => {
       let query = supabase
         .from('profiles')
@@ -94,7 +96,7 @@ export default function UsersList() {
       setAllRows(data)
     }
     setLoading(false)
-  }, [search, ghostOnly])
+  }, [debouncedSearch, ghostOnly])
 
   useEffect(() => {
     fetchRows()
